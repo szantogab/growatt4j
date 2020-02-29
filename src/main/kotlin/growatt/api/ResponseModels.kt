@@ -24,7 +24,11 @@ class PlantsResponse(val data: List<Plant>, val totalData: PlantsTotalData, erro
         val eTotalMoneyText: String,
         val todayEnergySum: String,
         val totalEnergySum: String
-    )
+    ) {
+        val todayEnergySumInKwh: Double get() = todayEnergySum.toKwh()
+        val totalEnergySumInKwh: Double get() = totalEnergySum.toKwh()
+        val currentPowerSumInKwh: Double get() = currentPowerSum.toKwh()
+    }
 
     data class Plant(
         val plantMoneyText: String,

@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "growatt"
-version = "1.0.1"
+version = "1.0.2"
 
 val sourcesJar by tasks.registering(Jar::class) {
     classifier = "sources"

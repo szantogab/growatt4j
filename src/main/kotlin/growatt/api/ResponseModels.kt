@@ -4,6 +4,7 @@ import com.google.gson.annotations.SerializedName
 import java.text.DecimalFormat
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import java.util.*
 
 /**
  * Wrapper class for all Growatt API response.
@@ -46,7 +47,7 @@ class PlantsResponse(val data: List<Plant>, val totalData: PlantsTotalData, erro
 }
 
 fun String.toKwh(): Double {
-    val number = DecimalFormat.getNumberInstance().parse(this).toDouble()
+    val number = DecimalFormat.getNumberInstance(Locale.ENGLISH).parse(this).toDouble()
     if (contains("kW", true)) return number
     if (contains("MW", true)) return number * 1000
     if (contains("GW", true)) return number * 1000 * 1000

@@ -36,8 +36,8 @@ class PlantsResponse(val data: List<Plant>, val totalData: PlantsTotalData, erro
         val currentPower: String
     ) {
         val todayEnergyInKwh: Double get() = todayEnergy.toKwh()
-        val totalEnergyInKwh: Double get() = totalEnergy.toKwh()
-        val currentPowerInKwh: Double get() = currentPower.toKwh()
+        val totalEnergyInKWh: Double get() = totalEnergy.toKwh()
+        val currentPowerInKw: Double get() = currentPower.toKwh()
     }
 }
 

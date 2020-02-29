@@ -9,7 +9,7 @@ plugins {
 }
 
 group = "growatt"
-version = "0.0.1"
+version = "1.0.0"
 
 val sourcesJar by tasks.registering(Jar::class) {
     classifier = "sources"
@@ -50,9 +50,10 @@ repositories {
 
 dependencies {
     implementation(kotlin("stdlib-jdk8"))
-    implementation("com.github.kittinunf.fuel:fuel:2.0.1")
-    implementation("com.github.kittinunf.fuel:fuel-coroutines:2.0.1")
-    implementation("com.github.kittinunf.fuel:fuel-gson:2.0.1")
+    implementation("com.github.kittinunf.fuel:fuel:2.2.1")
+    implementation("com.github.kittinunf.fuel:fuel-coroutines:2.2.1")
+    implementation("com.github.kittinunf.fuel:fuel-gson:2.2.1")
+    implementation("com.google.code.gson:gson:2.8.5")
 }
 
 tasks.withType<KotlinCompile> {

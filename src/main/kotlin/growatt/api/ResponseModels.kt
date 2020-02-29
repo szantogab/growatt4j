@@ -2,53 +2,62 @@ package growatt.api
 
 import com.google.gson.annotations.SerializedName
 import java.time.LocalDate
-import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 
 /**
  * Wrapper class for all Growatt API response.
  */
-data class GrowattResponse<T>(val data: T, @SerializedName("error_code") val errorCode: Long, @SerializedName("error_msg") val errorMessage: String?)
+//data class GrowattResponse<T>(val data: T, @SerializedName("error_code") val errorCode: Long, @SerializedName("error_msg") val errorMessage: String?)
+data class GrowattResponse<T : BaseGrowattResponseData>(val back: T)
+open class BaseGrowattResponseData(@SerializedName("errCode") val errorCode: Long, val success: Boolean)
 
-data class RegisterResponse(@SerializedName("c_user_id") val userId: Long)
+class LoginResponse(val userId: Long, val userLevel: Long, errorCode: Long, success: Boolean) :
+    BaseGrowattResponseData(errorCode, success)
 
-data class PlantsResponse(val count: Long, val plants: List<Plant>)
-data class Plant(
-    val name: String,
-    @SerializedName("plant_id") val plantId: Long,
-    @SerializedName("user_id") val userId: Long,
-    @SerializedName("image_url") val imageUrl: String?,
-    @SerializedName("peak_power") val peakPower: Double,
-    @SerializedName("total_energy") val totalEnergy: Double,
-    val longitude: Double, val latitude: Double,
-    val installer: String?,
-    val locale: String?
-)
+class PlantsResponse(val data: List<Plant>, val totalData: PlantsTotalData, errorCode: Long, success: Boolean) : BaseGrowattResponseData(errorCode, success) {
+    data class PlantsTotalData(val currentPowerSum: String, @SerializedName("CO2Sum") val co2Sum: String, val isHaveStorage: Boolean, val eTotalMoneyText: String, val todayEnergySum: String, val totalEnergySum: String)
+    data class Plant(
+        val plantMoneyText: String,
+        val plantName: String,
+        val plantId: Long,
+        val isHaveStorage: Boolean,
+        val todayEnergy: String,
+        val totalEnergy: String,
+        val currentPower: String
+    )
+}
 
-data class Inverter(@SerializedName("inverter_man") val inverterMan: String, @SerializedName("inverter_num") val inverterNum: Int)
-data class PlantDetail(
-    val name: String, @SerializedName("user_id") val userId: Long,
-    val description: String, @SerializedName("Locale") val locale: String,
-    val inverters: List<Inverter>
-)
+class PlantDetailResponse(val plantData: PlantBasic, val data: Map<String, String>, errorCode: Long, success: Boolean) : BaseGrowattResponseData(errorCode, success) {
+    data class PlantBasic(val plantMoneyText: String, val plantName: String, val plantId: Long, val currentEnergy: String)
+}
 
+class UserEnergyDataResponse(val monthProfitStr: String, val todayProfitStr: String, val plantNumber: Long, val treeValue: String, val treeStr: String, val nominalPowerStr: String, val formulaCoalValue: String, @SerializedName("powerValue") val currentPowerInWatts: Double, @SerializedName("todayValue") val todayValueInKwh: Double, @SerializedName("totalValue") val totalValueInKwh: Double, @SerializedName("monthValue") val monthValueInKwh: Double, val totalProfitStr: String)
 
-data class PlantData(
-    @SerializedName("peak_power_actual") val peakPowerActual: Double,
-    @SerializedName("monthly_energy") val monthlyEnergy: Double,
-    @SerializedName("last_update_time") val lastUpdate: LocalDateTime?,
-    @SerializedName("total_energy") val totalEnergy: Double,
-    @SerializedName("efficiency") val efficiency: Double,
-    @SerializedName("current_power") val currentPower: Double,
-    @SerializedName("today_energy") val todayEnergy: Double,
-    @SerializedName("yearly_energy") val yearlyEnergy: Double,
-    @SerializedName("carbon_offset") val carbonOffset: Double,
-    val timezone: String?
-)
+enum class TimeSpan(val value: Int) {
+    /**
+     * Power in each five minute of the day.
+     */
+    DAY(1),
 
+    /**
+     * Power on each day of the given month.
+     */
+    MONTH(2),
 
-data class PlantHistory(val count: Long, @SerializedName("time_unit") val timeUnit: TimeUnit, @SerializedName("energy") val energyInKwH: Double, @SerializedName("energys") val energies: List<Energy>)
-data class Energy(val date: LocalDate, val energy: Double)
+    /**
+     * Power in each month of the given year.
+     */
+    YEAR(3),
 
+    /**
+     * Power in each year. `date` parameter is ignored
+     */
+    TOTAL(4);
 
-data class PlantPowerResponse(val count: Long, val powers: List<Power>)
-data class Power(val time: LocalDateTime, val power: Double)
+    fun formatDate(date: LocalDate): String = when (this) {
+        YEAR -> date.format(DateTimeFormatter.ofPattern("yyyy"))
+        DAY -> date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+        MONTH -> date.format(DateTimeFormatter.ofPattern("yyyy-MM")) // power on each day of the month
+        TOTAL -> ""
+    }
+}

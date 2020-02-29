@@ -6,116 +6,69 @@ import com.github.kittinunf.fuel.httpGet
 import com.github.kittinunf.fuel.httpPost
 import java.security.MessageDigest
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 
-const val GROWATT_TEST_URL = "http://test.growatt.com/v1"
-const val GROWATT_PRODUCTION_URL = "https://server.growatt.com/v1"
+const val GROWATT_TEST_URL = "http://test.growatt.com"
+const val GROWATT_PRODUCTION_URL = "https://server.growatt.com"
 
-const val GROWATT_TEST_TOKEN = "6eb6f069523055a339d71e5b1f6c88cc"
-
-class GrowattApi(private val baseUrl: String, private val token: String) {
-    fun login(username: String, password: String) = "$baseUrl/user/login"
-        .httpPost(listOf("userName" to username, "password" to hashMd5(password)))
-        .responseObject<String>()
-
-    fun register(registerInput: RegisterInput) = "$baseUrl/user/user_register"
-        .httpPost(
-            listOf(
-                "user_name" to registerInput.userName,
-                "user_email" to registerInput.userEmail,
-                "user_password" to registerInput.userPassword,
-                "user_country" to registerInput.userCountry,
-                "user_tel" to registerInput.userTel,
-                "user_type" to registerInput.userType
-            )
-        )
-        .responseObject<GrowattResponse<RegisterResponse>>()
-        .validateResponse()
-
-    /**
-     * Checks whether the specified username is taken or not.
-     */
-    fun checkUserExists(userName: String) = "$baseUrl/user/check_user"
-        .httpPost(listOf("user_name" to userName))
-        .header("token" to token)
-        .responseObject<GrowattResponse<String>>()
-        .validateResponse()
-
+/**
+ * Main class that can be used to communicate with Growatt servers. Typically you obtain an instance of this class with [GrowattApi.productionApiLogin].
+ */
+class GrowattApi(private val baseUrl: String, private val cookies: List<String>) {
     /**
      * Obtains a list of the user's power plants.
      */
-    fun plants(userId: Long, filter: SearchFilter = SearchFilter()) = "$baseUrl/plant/list"
-        .httpGet(
-            listOf(
-                "C_user_id" to userId,
-                "search_type" to filter.searchType,
-                "search_keyword" to filter.searchKeyword,
-                "page" to filter.page,
-                "perpage" to filter.perpage
-            )
-        )
-        .header("token" to token)
+    fun plants() = "$baseUrl/PlantListAPI.do"
+        .httpGet()
+        .header("Cookie", cookies)
         .responseObject<GrowattResponse<PlantsResponse>>()
-        .validateResponse()
+        .validateResponse().third.get().back
 
     /**
      * Obtains the basic information of a power plant.
      */
-    fun plant(plantId: Long) = "$baseUrl/plant/details"
-        .httpGet(listOf("plant_id" to plantId))
-        .header("token" to token)
-        .responseObject<GrowattResponse<PlantDetail>>()
-        .validateResponse()
-
-    /**
-     * Obtains an overview of the data for the specified plant.
-     */
-    fun plantData(plantId: Long) = "$baseUrl/plant/data"
-        .httpGet(listOf("plant_id" to plantId))
-        .header("token" to token)
-        .responseObject<GrowattResponse<PlantData>>()
-        .validateResponse()
-
-    fun plantHistory(plantId: Long, filter: PlantHistoryFilter = PlantHistoryFilter()) = "$baseUrl/plant/energy"
+    fun plant(plantId: Long, timeSpan: TimeSpan, date: LocalDate?) = "$baseUrl/PlantDetailAPI.do"
         .httpGet(
             listOf(
-                "plant_id" to plantId,
-                "start_date" to filter.startDate.format(DateTimeFormatter.ISO_LOCAL_DATE),
-                "end_date" to filter.endDate.format(DateTimeFormatter.ISO_LOCAL_DATE),
-                "time_unit" to filter.timeUnit,
-                "page" to filter.page,
-                "perpage" to filter.perpage
-            )
+                "plantId" to plantId,
+                "type" to timeSpan.value,
+                "date" to date?.let { timeSpan.formatDate(it) })
         )
-        .header("token" to token)
-        .responseObject<GrowattResponse<PlantHistory>>()
-        .validateResponse()
-
-    fun plantPower(plantId: Long, date: LocalDate) = "$baseUrl/plant/power"
-        .httpGet(listOf("plant_id" to plantId, "date" to date.format(DateTimeFormatter.ISO_LOCAL_DATE)))
-        .header("token" to token)
-        .responseObject<GrowattResponse<PlantPowerResponse>>()
-        .validateResponse()
+        .header("Cookie", cookies)
+        .responseObject<GrowattResponse<PlantDetailResponse>>()
+        .validateResponse().third.get().back
 
     /**
-     * Validates the response if the status is 200, or throws a [GrowattException].
+     * Obtains overall data.
      */
-    private fun <T> ResponseResultOf<GrowattResponse<T>>.validateResponse(): ResponseResultOf<GrowattResponse<T>> {
-        val result = this.third
-        val (data, error) = result
-        if (error != null) throw error
-
-        if (data != null && (data.errorMessage?.isNotBlank() == true || data.errorCode != GROWATT_ERROR_CODE_OK)) throw GrowattException(
-            data.errorCode,
-            data.errorMessage
-        )
-        return this
-    }
+    fun userEnergyData() = "$baseUrl/newPlantAPI.do"
+        .httpPost(listOf("action" to "getUserCenterEnertyData"))
+        .header("Cookie", cookies)
+        .responseObject<UserEnergyDataResponse>().third.get()
 
     companion object {
-        fun testApi() = GrowattApi(GROWATT_TEST_URL, GROWATT_TEST_TOKEN)
-        fun productionApi(token: String) = GrowattApi(GROWATT_PRODUCTION_URL, token)
+        fun productionApiLogin(username: String, password: String): GrowattApi {
+            val result = "$GROWATT_PRODUCTION_URL/LoginAPI.do"
+                .httpPost(listOf("userName" to username, "password" to hashMd5(password)))
+                .responseObject<GrowattResponse<LoginResponse>>()
+                .validateResponse()
+
+            val cookies = result.second.header("Set-Cookie")
+            return GrowattApi(GROWATT_PRODUCTION_URL, cookies.toList())
+        }
     }
+}
+
+/**
+ * Validates the response if the status is 200, or throws a [GrowattException].
+ */
+fun <T : BaseGrowattResponseData> ResponseResultOf<GrowattResponse<T>>.validateResponse(): ResponseResultOf<GrowattResponse<T>> {
+    val (data, error) = third
+    if (error != null) throw error
+
+    if (data != null && (!data.back.success)) throw GrowattException(data.back.errorCode)
+    return this
 }
 
 private fun hashMd5(password: String): String {
@@ -130,31 +83,3 @@ private fun hashMd5(password: String): String {
         if (hex[i] == 0)
     }*/
 }
-
-data class PlantHistoryFilter(
-    val startDate: LocalDate = LocalDate.now(),
-    val endDate: LocalDate = LocalDate.now(),
-    val timeUnit: TimeUnit? = TimeUnit.DAY,
-    val page: Int? = 1,
-    val perpage: Int? = 20
-)
-
-enum class TimeUnit {
-    DAY, MONTH, YEAR
-}
-
-data class SearchFilter(
-    val searchType: String? = null,
-    val searchKeyword: String? = null,
-    val page: Int? = 1,
-    val perpage: Int? = 20
-)
-
-data class RegisterInput(
-    val userName: String,
-    val userPassword: String,
-    val userEmail: String,
-    val userTel: String? = null,
-    val userCountry: String,
-    val userType: Int = 1
-)
